@@ -15,7 +15,10 @@ test:
 fmt:
 	cargo fmt
 
-lint:
+check:
+	cargo check --all-targets
+
+clippy:
 	cargo clippy -- -D warnings
 
 doc:

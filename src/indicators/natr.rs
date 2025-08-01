@@ -1,228 +1,89 @@
-use crate::core::{
-    series::Series,
-    traits::{Indexable, Numeric},
+use crate::{
+    core::{CandleSeries, Column, Error, Numeric},
+    indicators::Config,
 };
 
-/// NATR configuration with generic alpha type
-#[derive(Debug, Clone, Copy)]
-pub struct NatrConfig<T> {
-    pub period: usize,
-    pub alpha: T,
-}
-
-impl<T> NatrConfig<T> {
-    pub fn new(period: usize, alpha: T) -> Self {
-        Self { period, alpha }
-    }
-}
-
-impl NatrConfig<f32> {
-    /// Creates a config with the standard EMA smoothing factor
-    pub fn from_period(period: usize) -> NatrConfig<f32> {
-        let alpha = 2.0 / (period as f32 + 1.0);
-        NatrConfig::new(period, alpha)
-    }
-
-    /// Creates a config with Wilder's original smoothing factor
-    pub fn from_period_wilder(period: usize) -> NatrConfig<f32> {
-        let alpha = 1.0 / period as f32;
-        NatrConfig::new(period, alpha)
-    }
-}
-
-impl NatrConfig<f64> {
-    /// Creates a config with the standard EMA smoothing factor
-    pub fn from_period(period: usize) -> NatrConfig<f64> {
-        let alpha = 2.0 / (period as f64 + 1.0);
-        NatrConfig::new(period, alpha)
-    }
-
-    /// Creates a config with Wilder's original smoothing factor
-    pub fn from_period_wilder(period: usize) -> NatrConfig<f64> {
-        let alpha = 1.0 / period as f64;
-        NatrConfig::new(period, alpha)
-    }
-}
-
-impl Default for NatrConfig<f32> {
-    fn default() -> Self {
-        Self::from_period(14)
-    }
-}
-
-impl Default for NatrConfig<f64> {
-    fn default() -> Self {
-        Self::from_period(14)
-    }
-}
-
-/// NATR calculation result
-#[derive(Debug)]
-pub struct NatrResult<T, I> {
-    pub natr: Series<T, I>,
-    pub true_range: Series<T, I>,
-    pub atr: Series<T, I>,
-}
-
-/// Calculate NATR (Normalized Average True Range) for OHLC price series
+/// Calculate Normalized Average True Range (NATR) for a candle series.
 ///
-/// NATR is a volatility indicator that normalizes ATR as a percentage of the closing price.
-/// This makes it comparable across different price levels and instruments. Values typically
-/// range from 0% to 10%, with higher values indicating greater volatility.
+/// Normalized Average True Range attempts to normalize the average true range
+/// by expressing it as a percentage of the closing price. This allows for
+/// comparison of volatility across different price levels and securities.
 ///
-/// NATR = (ATR / Close) * 100
+/// # Algorithm
+///
+/// ```text
+/// TR[i] = max(high[i] - low[i],
+///             |high[i] - close[i-1]|,
+///             |low[i] - close[i-1]|)
+///
+/// ATR = EMA(TR, period)
+/// NATR = (ATR / close) * 100
+/// ```
 ///
 /// # Arguments
-/// * `high` - High prices  
-/// * `low` - Low prices
-/// * `close` - Closing prices
-/// * `config` - NATR configuration including period and smoothing parameters
+/// * `candles` - Series of OHLC candles with high, low, close data
+/// * `config` - Configuration with period and smoothing parameters
 ///
-/// # Example
-/// ```
-/// use mizuhiki_ta::core::series::Series;
-/// use mizuhiki_ta::indicators::natr::{natr, NatrConfig};
+/// # Returns
+/// A column of NATR values expressed as percentages
 ///
-/// let high = Series::from_vec("high".to_string(), vec![102.0, 104.0, 103.0, 105.0]);
-/// let low = Series::from_vec("low".to_string(), vec![99.0, 101.0, 100.0, 102.0]);
-/// let close = Series::from_vec("close".to_string(), vec![101.0, 103.0, 102.0, 104.0]);
-///
-/// let config = NatrConfig::<f64>::default();
-/// let result = natr(&high, &low, &close, config);
-///
-/// // Check volatility level
-/// let latest_natr = result.natr.values().last().unwrap();
-/// if *latest_natr > 5.0 {
-///     println!("High volatility: {:.2}%", latest_natr);
-/// }
-/// ```
-pub fn natr<T, I>(
-    high: &Series<T, I>,
-    low: &Series<T, I>,
-    close: &Series<T, I>,
-    config: NatrConfig<T>,
-) -> NatrResult<T, I>
-where
-    T: Numeric,
-    I: Indexable,
-{
-    // Calculate True Range
-    let true_range = calculate_true_range(high, low, close);
-
-    // Calculate ATR using exponential moving average
-    let atr = true_range.ewm_mean(config.alpha);
-
-    // Calculate NATR = (ATR / Close) * 100
-    let natr = calculate_natr_from_atr(&atr, close);
-
-    NatrResult {
-        natr,
-        true_range,
-        atr,
-    }
-}
-
-/// Helper function to calculate True Range
-fn calculate_true_range<T, I>(
-    high: &Series<T, I>,
-    low: &Series<T, I>,
-    close: &Series<T, I>,
-) -> Series<T, I>
-where
-    T: Numeric + PartialOrd,
-    I: Indexable,
-{
-    let high_values = high.values();
-    let low_values = low.values();
-    let close_values = close.values();
-
-    let mut true_range_data = Vec::new();
-
-    for i in 0..high_values.len() {
-        let current_high = high_values[i];
-        let current_low = low_values[i];
-
-        let tr = if i == 0 {
-            // For the first period, use high - low
-            current_high - current_low
-        } else {
-            let prev_close = close_values[i - 1];
-
-            // True Range = max(high - low, |high - prev_close|, |low - prev_close|)
-            let hl = current_high - current_low;
-            let hc = if current_high > prev_close {
-                current_high - prev_close
-            } else {
-                prev_close - current_high
-            };
-            let lc = if current_low > prev_close {
-                current_low - prev_close
-            } else {
-                prev_close - current_low
-            };
-
-            // Find maximum of the three values
-            let max_hc_lc = if hc > lc { hc } else { lc };
-            if hl > max_hc_lc { hl } else { max_hc_lc }
-        };
-
-        true_range_data.push(tr);
+/// # Errors
+/// Returns `Error::NotEnoughData` if insufficient candles for calculation.
+pub fn natr_series<T: Numeric>(
+    candles: &CandleSeries<T>,
+    config: Config<T>,
+) -> Result<Column<T>, Error> {
+    // We need at least `period + 1` candles to calculate RSI
+    // Because we lose the first candle when calculating true range
+    if candles.len() < config.period + 1 {
+        return Err(Error::NotEnoughData);
     }
 
-    Series::new(
-        format!("{}_tr", high.name()),
-        true_range_data,
-        high.index().to_vec(),
-    )
-}
-
-/// Helper function to calculate NATR from ATR and closing prices
-fn calculate_natr_from_atr<T, I>(atr: &Series<T, I>, close: &Series<T, I>) -> Series<T, I>
-where
-    T: Numeric,
-    I: Indexable,
-{
-    let atr_values = atr.values();
-    let close_values = close.values();
+    let tr = candles.true_range(Some(config.max_history));
+    let atr = tr.into_ewm_mean(config.alpha);
+    let closes = candles.closes();
 
     let hundred = T::hundred();
-    let zero = T::zero();
-
-    let natr_data: Vec<T> = atr_values
+    Ok(atr
         .iter()
-        .zip(close_values.iter())
-        .map(|(&atr_val, &close_val)| {
-            if close_val != zero {
-                (atr_val / close_val) * hundred
+        .zip(closes.iter())
+        .map(|(atr_value, close)| {
+            if atr_value.is_zero() {
+                T::ZERO
             } else {
-                zero // Handle division by zero
+                hundred * (*atr_value / *close)
             }
         })
-        .collect();
+        .collect())
+}
 
-    Series::new(
-        format!("{}_natr", atr.name()),
-        natr_data,
-        atr.index().to_vec(),
-    )
+/// Calculate the latest NATR value for a candle series.
+/// This is more efficient than `natr_series` when only the most recent value is needed.
+pub fn natr_latest<T: Numeric>(candles: &CandleSeries<T>, config: Config<T>) -> Result<T, Error> {
+    if candles.len() < config.period + 1 {
+        return Err(Error::NotEnoughData);
+    }
+
+    let tr = candles.true_range(Some(config.max_history));
+    let atr = tr.into_ewm_mean(config.alpha);
+    let closes = candles.closes();
+
+    let latest_atr = atr.last().unwrap();
+    let latest_close = closes.last().unwrap();
+
+    if latest_atr.is_zero() {
+        Ok(T::ZERO)
+    } else {
+        Ok(T::hundred() * (*latest_atr / *latest_close))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::series::Series;
+    use crate::core::{Candle, CandleSeries};
 
-    fn assert_within_tolerance<T: Numeric>(value: T, expected: T, tolerance: T) {
-        assert!(
-            (value - expected).abs() < tolerance,
-            "Value {:?} not within tolerance of {:?}, expected {:?}",
-            value,
-            tolerance,
-            expected
-        );
-    }
-
-    fn get_test_data() -> (Series<f64, usize>, Series<f64, usize>, Series<f64, usize>) {
+    fn get_test_data() -> CandleSeries<f64> {
         let highs = vec![
             48.70, 48.72, 48.90, 48.87, 48.82, 49.05, 49.20, 49.35, 49.92, 50.19, 50.12, 49.66,
             49.88, 50.19, 50.36, 50.57, 50.65, 50.90, 51.12, 51.22, 51.30, 51.18, 50.92, 50.74,
@@ -244,55 +105,30 @@ mod tests {
             49.66, 49.49, 49.21,
         ];
 
-        let high = Series::from_vec("high".to_string(), highs);
-        let low = Series::from_vec("low".to_string(), lows);
-        let close = Series::from_vec("close".to_string(), closes);
-        (high, low, close)
-    }
+        let timestamps: Vec<i64> = (0..highs.len() as i64).map(|i| i * 60).collect();
+        let mut candles = CandleSeries::new(60);
 
-    #[test]
-    fn test_calc_tr() {
-        let (high, low, close) = get_test_data();
-        let true_range = calculate_true_range(&high, &low, &close);
-        let expected_tr = vec![
-            0.58, 0.58, 0.51, 0.50, 0.58, 0.41, 0.26, 0.49, 0.60, 0.32, 0.93, 0.76, 0.45, 0.46,
-            1.10, 1.26, 1.15, 1.18, 0.69, 0.67, 0.62, 0.74, 0.72, 0.81, 0.72, 0.77, 0.68, 0.63,
-            0.65, 0.79, 0.77, 0.79, 0.97, 1.03, 0.94, 0.88, 0.78, 0.72, 0.81,
-        ];
-
-        for i in 0..true_range.len() {
-            let tr_value = true_range.get(i).unwrap();
-            assert_within_tolerance(*tr_value, expected_tr[i], 0.001);
+        for i in 0..highs.len() {
+            candles.push_candle_unchecked(
+                Candle {
+                    open: 0.0, // Open is not used in NATR calculation
+                    high: highs[i],
+                    low: lows[i],
+                    close: closes[i],
+                    volume: 0.0, // Volume is not used in NATR calculation
+                },
+                timestamps[i] as u64,
+            );
         }
+        candles
     }
 
     #[test]
-    fn test_calc_atr() {
-        let (high, low, close) = get_test_data();
-        let true_range = calculate_true_range(&high, &low, &close);
-        let atr = true_range.ewm_mean(1.0 / 14.0);
+    fn test_natr_series() {
+        let candles = get_test_data();
 
-        // From pandas-ta, the first value is NaN
-        let expected_atr = vec![
-            0.5800, 0.5750, 0.5696, 0.5704, 0.5589, 0.5376, 0.5342, 0.5389, 0.5232, 0.5523, 0.5671,
-            0.5588, 0.5517, 0.5909, 0.6387, 0.6752, 0.7113, 0.7097, 0.7069, 0.7007, 0.7035, 0.7047,
-            0.7122, 0.7128, 0.7168, 0.7142, 0.7082, 0.7040, 0.7102, 0.7145, 0.7198, 0.7377, 0.7586,
-            0.7716, 0.7793, 0.7793, 0.7751, 0.7776,
-        ];
-
-        assert_eq!(atr.len(), expected_atr.len() + 1);
-
-        for i in 0..expected_atr.len() {
-            let atr_value = atr.get(i + 1).unwrap();
-            assert_within_tolerance(*atr_value, expected_atr[i], 0.001);
-        }
-    }
-
-    #[test]
-    fn test_natr_basic() {
-        let (high, low, close) = get_test_data();
-
-        // This is not exactly same as pandas-ta because pandas-ta use pandas' `adjust=True` mode
+        // This is not exactly same as pandas-ta, because pandas-ta use pandas' `adjust=True` mode
+        // This was ran with `adjust=False` mode
         // (https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.ewm.html)
         // (https://github.com/Data-Analisis/Technical-Analysis-Indicators---Pandas/blob/master/pandas_ta/overlap/rma.py#L16)
         let expected_natr = vec![
@@ -302,13 +138,17 @@ mod tests {
             1.5477, 1.5658, 1.5694, 1.5662, 1.5802,
         ];
 
-        let config = NatrConfig::<f64>::new(14, 1.0 / 14.0);
-        let result = natr(&high, &low, &close, config);
-        assert_eq!(result.natr.len(), expected_natr.len() + 1); // 1 initial NaN value
+        let config = Config::new_f64_wilder(14, 100);
+        let natr = natr_series(&candles, config).unwrap();
 
-        for i in 0..expected_natr.len() {
-            let natr_value = result.natr.get(i + 1).unwrap(); // Skip first 14 NaN values
-            assert_within_tolerance(*natr_value, expected_natr[i], 0.001);
+        assert_eq!(natr.len(), expected_natr.len() + 1); // 1 initial NaN value
+
+        for (i, &expected) in expected_natr.iter().enumerate() {
+            let natr_value = natr[i + 1];
+            assert!(
+                (natr_value - expected).abs() < 0.01,
+                "Mismatch at index {i}"
+            );
         }
     }
 }

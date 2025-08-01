@@ -1,7 +1,7 @@
 use std::{
     fmt::Debug,
-    iter::{Product, Sum},
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
+    iter::Sum,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Rem, RemAssign, Sub, SubAssign},
 };
 
 /// Trait for numeric types that can be used in technical analysis calculations.
@@ -15,7 +15,6 @@ pub trait Numeric:
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
-    + Neg<Output = Self>
     + Rem<Output = Self>
     + AddAssign
     + SubAssign
@@ -23,118 +22,61 @@ pub trait Numeric:
     + DivAssign
     + RemAssign
     + Sum
-    + Product
 {
-    fn abs(self) -> Self;
+    const ZERO: Self;
+    const ONE: Self;
 
-    fn one() -> Self;
-
-    fn zero() -> Self {
-        Self::default()
-    }
-
-    fn two() -> Self {
-        Self::one() + Self::one()
-    }
-
-    fn fifty() -> Self {
-        Self::hundred() / Self::two()
-    }
-
+    fn two() -> Self;
+    fn fifty() -> Self;
     fn hundred() -> Self;
+    fn abs(self) -> Self;
+    fn max(self, other: Self) -> Self;
+    fn is_positive(self) -> bool {
+        self > Self::ZERO
+    }
+    fn is_zero(self) -> bool {
+        self == Self::ZERO
+    }
 }
 
 impl Numeric for f32 {
-    fn abs(self) -> Self {
-        self.abs()
-    }
-
-    fn one() -> Self {
-        1.0
-    }
+    const ZERO: Self = 0.0;
+    const ONE: Self = 1.0;
 
     fn two() -> Self {
         2.0
     }
-
     fn fifty() -> Self {
         50.0
     }
-
     fn hundred() -> Self {
         100.0
+    }
+    fn abs(self) -> Self {
+        self.abs()
+    }
+    fn max(self, other: Self) -> Self {
+        self.max(other)
     }
 }
 
 impl Numeric for f64 {
-    fn abs(self) -> Self {
-        self.abs()
-    }
-
-    fn one() -> Self {
-        1.0
-    }
+    const ZERO: Self = 0.0;
+    const ONE: Self = 1.0;
 
     fn two() -> Self {
         2.0
     }
-
     fn fifty() -> Self {
         50.0
     }
-
     fn hundred() -> Self {
         100.0
     }
-}
-
-impl Numeric for i32 {
     fn abs(self) -> Self {
         self.abs()
     }
-
-    fn one() -> Self {
-        1
-    }
-
-    fn two() -> Self {
-        2
-    }
-
-    fn fifty() -> Self {
-        50
-    }
-
-    fn hundred() -> Self {
-        100
+    fn max(self, other: Self) -> Self {
+        self.max(other)
     }
 }
-
-impl Numeric for i64 {
-    fn abs(self) -> Self {
-        self.abs()
-    }
-
-    fn one() -> Self {
-        1
-    }
-
-    fn two() -> Self {
-        2
-    }
-
-    fn fifty() -> Self {
-        50
-    }
-
-    fn hundred() -> Self {
-        100
-    }
-}
-
-/// Trait for types that can be used as series indices.
-pub trait Indexable: Copy + Default + PartialOrd + PartialEq + Ord + Eq + std::hash::Hash {}
-
-/// Blanket implementation of Indexable for all suitable types.
-impl<T> Indexable for T where T: Copy + Default + PartialOrd + PartialEq + Ord + Eq + std::hash::Hash
-{}
