@@ -16,6 +16,14 @@ where
     T: Numeric,
     I: Indexable,
 {
+    pub fn new(name: String) -> Self {
+        Series {
+            name,
+            column: Column::default(),
+            index: Vec::new(),
+        }
+    }
+
     /// Creates a new Series with the given name, data, and index.
     ///
     /// # Arguments
@@ -35,21 +43,35 @@ where
     ///
     /// let data = vec![10.0, 20.0, 30.0];
     /// let index = vec![1, 2, 3];
-    /// let series = Series::new("test".to_string(), data, index);
+    /// let series = Series::from_data("test".to_string(), data, index, None);
     /// assert_eq!(series.len(), 3);
     /// ```
-    pub fn new(name: String, data: Vec<T>, index: Vec<I>) -> Self {
+    pub fn from_data(name: String, data: Vec<T>, index: Vec<I>, capacity: Option<usize>) -> Self {
         assert_eq!(data.len(), index.len(), "Data and index length must match");
         Series {
             name,
-            column: Column::new(data),
+            column: Column::from_vec_with_capacity(data, capacity),
             index,
         }
     }
 
-    /// Returns the name of this series.
+    pub fn push(&mut self, value: T, index: I) {
+        self.column.push(value);
+        self.index.push(index);
+    }
+
+    pub fn extend(&mut self, values: impl IntoIterator<Item = (T, I)>) {
+        for (value, index) in values {
+            self.push(value, index);
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn capacity(&self) -> Option<usize> {
+        self.column.capacity()
     }
 
     pub fn set_name(&mut self, name: String) {
@@ -158,13 +180,13 @@ where
     /// ```rust
     /// use mizuhiki_ta::core::series::Series;
     ///
-    /// let series = Series::from_vec("my_data".to_string(), vec![10.0, 20.0, 30.0]);
+    /// let series = Series::from_vec("my_data".to_string(), vec![10.0, 20.0, 30.0], None);
     /// assert_eq!(series.len(), 3);
     /// assert_eq!(series.index(), &[0, 1, 2]);
     /// assert_eq!(series.get(1), Some(&20.0));
     /// ```
-    pub fn from_vec(name: String, data: Vec<T>) -> Self {
+    pub fn from_vec(name: String, data: Vec<T>, capacity: Option<usize>) -> Self {
         let index = (0..data.len()).collect();
-        Series::new(name, data, index)
+        Series::from_data(name, data, index, capacity)
     }
 }

@@ -206,9 +206,10 @@ fn benchmark_rsi_types() {
             .map(|&p| Decimal::new(p as f64 / 1000.0))
             .collect();
 
-        let f32_series = Series::from_vec("benchmark_f32".to_string(), f32_prices);
-        let f64_series = Series::from_vec("benchmark_f64".to_string(), f64_prices);
-        let decimal_series = Series::from_vec("benchmark_decimal".to_string(), decimal_prices);
+        let f32_series = Series::from_vec("benchmark_f32".to_string(), f32_prices, None);
+        let f64_series = Series::from_vec("benchmark_f64".to_string(), f64_prices, None);
+        let decimal_series =
+            Series::from_vec("benchmark_decimal".to_string(), decimal_prices, None);
 
         // f32 benchmark
         let start = Instant::now();
@@ -276,17 +277,18 @@ fn benchmark_natr_types() {
             .map(|&p| Decimal::new(p as f64 / 1000.0))
             .collect();
 
-        let f32_high_series = Series::from_vec("high_f32".to_string(), f32_high);
-        let f32_low_series = Series::from_vec("low_f32".to_string(), f32_low);
-        let f32_close_series = Series::from_vec("close_f32".to_string(), f32_close);
+        let f32_high_series = Series::from_vec("high_f32".to_string(), f32_high, None);
+        let f32_low_series = Series::from_vec("low_f32".to_string(), f32_low, None);
+        let f32_close_series = Series::from_vec("close_f32".to_string(), f32_close, None);
 
-        let f64_high_series = Series::from_vec("high_f64".to_string(), f64_high);
-        let f64_low_series = Series::from_vec("low_f64".to_string(), f64_low);
-        let f64_close_series = Series::from_vec("close_f64".to_string(), f64_close);
+        let f64_high_series = Series::from_vec("high_f64".to_string(), f64_high, None);
+        let f64_low_series = Series::from_vec("low_f64".to_string(), f64_low, None);
+        let f64_close_series = Series::from_vec("close_f64".to_string(), f64_close, None);
 
-        let decimal_high_series = Series::from_vec("high_decimal".to_string(), decimal_high);
-        let decimal_low_series = Series::from_vec("low_decimal".to_string(), decimal_low);
-        let decimal_close_series = Series::from_vec("close_decimal".to_string(), decimal_close);
+        let decimal_high_series = Series::from_vec("high_decimal".to_string(), decimal_high, None);
+        let decimal_low_series = Series::from_vec("low_decimal".to_string(), decimal_low, None);
+        let decimal_close_series =
+            Series::from_vec("close_decimal".to_string(), decimal_close, None);
 
         // f32 benchmark
         let start = Instant::now();
@@ -353,9 +355,9 @@ fn accuracy_comparison() {
         .map(|&p| Decimal::new(p as f64 / 1000.0))
         .collect();
 
-    let f32_series = Series::from_vec("test_f32".to_string(), f32_prices);
-    let f64_series = Series::from_vec("test_f64".to_string(), f64_prices);
-    let decimal_series = Series::from_vec("test_decimal".to_string(), decimal_prices);
+    let f32_series = Series::from_vec("test_f32".to_string(), f32_prices, None);
+    let f64_series = Series::from_vec("test_f64".to_string(), f64_prices, None);
+    let decimal_series = Series::from_vec("test_decimal".to_string(), decimal_prices, None);
 
     let f32_config = RsiConfig::<f32>::default();
     let f64_config = RsiConfig::<f64>::default();

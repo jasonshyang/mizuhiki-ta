@@ -1,14 +1,62 @@
 use crate::core::traits::Numeric;
 
 /// A generic column data structure for storing numeric data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Column<T> {
     data: Vec<T>,
+    capacity: Option<usize>,
 }
 
 impl<T: Numeric> Column<T> {
-    pub fn new(data: Vec<T>) -> Self {
-        Self { data }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn new_with_capacity(capacity: usize) -> Self {
+        if capacity == 0 {
+            return Self::default();
+        }
+
+        Self {
+            data: Vec::with_capacity(capacity),
+            capacity: Some(capacity),
+        }
+    }
+
+    pub fn from_vec(data: Vec<T>) -> Self {
+        let capacity = data.capacity();
+
+        if capacity == 0 {
+            return Self::default();
+        }
+
+        Self {
+            data,
+            capacity: Some(capacity),
+        }
+    }
+
+    pub fn from_vec_with_capacity(data: Vec<T>, capacity: Option<usize>) -> Self {
+        Self { data, capacity }
+    }
+
+    pub fn push(&mut self, value: T) {
+        if let Some(capacity) = self.capacity {
+            if self.data.len() >= capacity {
+                self.data.remove(0);
+            }
+        }
+        self.data.push(value);
+    }
+
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = T>) {
+        for value in iter {
+            self.push(value);
+        }
+    }
+
+    pub fn capacity(&self) -> Option<usize> {
+        self.capacity
     }
 
     pub fn data(&self) -> &[T] {
@@ -49,7 +97,7 @@ impl<T: Numeric> Column<T> {
     /// # Example
     /// ```
     /// use mizuhiki_ta::core::column::Column;
-    /// let mut prices = Column::new(vec![100.0, 102.0, 98.0]);
+    /// let mut prices = Column::from_vec(vec![100.0, 102.0, 98.0]);
     /// prices.apply(|x| *x *= 2.0);
     /// assert_eq!(prices.data(), vec![200.0, 204.0, 196.0]);
     /// ```
@@ -74,7 +122,7 @@ impl<T: Numeric> Column<T> {
     /// # Example
     /// ```
     /// use mizuhiki_ta::core::column::Column;
-    /// let prices = Column::new(vec![100.0, 102.0, 98.0]);
+    /// let prices = Column::from_vec(vec![100.0, 102.0, 98.0]);
     /// let doubled = prices.map(|x| x * 2.0);
     /// assert_eq!(doubled.data(), vec![200.0, 204.0, 196.0]);
     /// ```
@@ -86,6 +134,7 @@ impl<T: Numeric> Column<T> {
     {
         Column {
             data: self.data.iter().map(f).collect(),
+            capacity: self.capacity,
         }
     }
 
@@ -102,7 +151,7 @@ impl<T: Numeric> Column<T> {
     /// ```
     /// use mizuhiki_ta::core::column::Column;
     ///
-    /// let column = Column::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+    /// let column = Column::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
     /// let (filtered, indices) = column.filter(|&x| x > 3.0);
     /// assert_eq!(filtered.len(), 2);
     /// assert_eq!(indices, vec![3, 4]);
@@ -111,15 +160,18 @@ impl<T: Numeric> Column<T> {
     where
         F: Fn(&T) -> bool,
     {
-        let mut filtered_data = Vec::new();
-        let mut filtered_indices = Vec::new();
+        let mut filtered_data = Vec::with_capacity(self.data.len());
+        let mut filtered_indices = Vec::with_capacity(self.data.len());
         for (i, v) in self.data.iter().enumerate() {
             if f(v) {
                 filtered_data.push(*v);
                 filtered_indices.push(i);
             }
         }
-        (Column::new(filtered_data), filtered_indices)
+        (
+            Column::from_vec_with_capacity(filtered_data, self.capacity),
+            filtered_indices,
+        )
     }
 
     /// Get raw data as a slice.
@@ -141,7 +193,7 @@ impl<T: Numeric> Column<T> {
     /// ```
     /// use mizuhiki_ta::core::column::Column;
     ///
-    /// let prices = Column::new(vec![100.0, 102.0, 98.0, 105.0]);
+    /// let prices = Column::from_vec(vec![100.0, 102.0, 98.0, 105.0]);
     /// let changes = prices.diff();
     /// assert_eq!(changes.get(0), Some(&0.0)); // First element is default
     /// assert_eq!(changes.get(1), Some(&2.0));  // 102 - 100
@@ -149,7 +201,7 @@ impl<T: Numeric> Column<T> {
     /// ```
     pub fn diff(&self) -> Column<T> {
         if self.data.len() <= 1 {
-            return Column::new(vec![T::default(); self.data.len()]);
+            return Column::default();
         }
 
         let mut result = Vec::with_capacity(self.data.len());
@@ -159,7 +211,7 @@ impl<T: Numeric> Column<T> {
             result.push(self.data[i] - self.data[i - 1]);
         }
 
-        Column::new(result)
+        Column::from_vec_with_capacity(result, self.capacity)
     }
 
     /// Calculate exponential moving average (EMA) with alpha smoothing factor.
@@ -176,7 +228,7 @@ impl<T: Numeric> Column<T> {
     /// ```
     /// use mizuhiki_ta::core::column::Column;
     ///
-    /// let prices = Column::new(vec![100.0, 102.0, 98.0, 105.0]);
+    /// let prices = Column::from_vec(vec![100.0, 102.0, 98.0, 105.0]);
     /// let ema = prices.ewm_mean(0.3f64);
     ///
     /// assert_eq!(ema.get(0), Some(&100.0)); // First value is the same
@@ -184,7 +236,7 @@ impl<T: Numeric> Column<T> {
     /// ```
     pub fn ewm_mean(&self, alpha: T) -> Column<T> {
         if self.data.is_empty() {
-            return Column::new(Vec::new());
+            return Column::default();
         }
 
         let mut result = Vec::with_capacity(self.data.len());
@@ -199,7 +251,7 @@ impl<T: Numeric> Column<T> {
             result.push(ema);
         }
 
-        Column::new(result)
+        Column::from_vec_with_capacity(result, self.capacity)
     }
 }
 
@@ -228,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_ewm_mean() {
-        let prices = Column::new(vec![
+        let prices = Column::from_vec(vec![
             44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03,
             45.61, 46.28, 46.28, 46.00, 46.03, 46.41, 46.22, 45.64, 46.21, 46.25, 45.71, 46.45,
             45.78, 45.35, 44.03, 44.18, 44.22, 44.57, 43.42, 42.66, 43.13,
@@ -252,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_ewm_mean2() {
-        let tr = Column::new(vec![
+        let tr = Column::from_vec(vec![
             0.58, 0.51, 0.50, 0.58, 0.41, 0.26, 0.49, 0.60, 0.32, 0.93, 0.76, 0.45, 0.46, 1.10,
             1.26, 1.15, 1.18, 0.69, 0.67, 0.62, 0.74, 0.72, 0.81, 0.72, 0.77, 0.68, 0.63, 0.65,
             0.79, 0.77, 0.79, 0.97, 1.03, 0.94, 0.88, 0.78, 0.72, 0.81,

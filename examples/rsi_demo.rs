@@ -11,7 +11,7 @@ fn main() {
         174.2,
     ];
 
-    let series = Series::from_vec("AAPL_close".to_string(), prices);
+    let series = Series::from_vec("AAPL_close".to_string(), prices, None);
 
     println!("Processing {} price points\n", series.len());
 

@@ -83,9 +83,9 @@ pub struct NatrResult<T, I> {
 /// use mizuhiki_ta::core::series::Series;
 /// use mizuhiki_ta::indicators::natr::{natr, NatrConfig};
 ///
-/// let high = Series::from_vec("high".to_string(), vec![102.0, 104.0, 103.0, 105.0]);
-/// let low = Series::from_vec("low".to_string(), vec![99.0, 101.0, 100.0, 102.0]);
-/// let close = Series::from_vec("close".to_string(), vec![101.0, 103.0, 102.0, 104.0]);
+/// let high = Series::from_vec("high".to_string(), vec![102.0, 104.0, 103.0, 105.0], None);
+/// let low = Series::from_vec("low".to_string(), vec![99.0, 101.0, 100.0, 102.0], None);
+/// let close = Series::from_vec("close".to_string(), vec![101.0, 103.0, 102.0, 104.0], None);
 ///
 /// let config = NatrConfig::<f64>::default();
 /// let result = natr(&high, &low, &close, config);
@@ -106,6 +106,12 @@ where
     T: Numeric,
     I: Indexable,
 {
+    // Validate input series lengths
+    assert!(
+        high.len() == low.len() && low.len() == close.len(),
+        "High, low, and close series must have the same length",
+    );
+
     // Calculate True Range
     let true_range = calculate_true_range(high, low, close);
 
@@ -169,10 +175,11 @@ where
         true_range_data.push(tr);
     }
 
-    Series::new(
+    Series::from_data(
         format!("{}_tr", high.name()),
         true_range_data,
         high.index().to_vec(),
+        Some(high.len()),
     )
 }
 
@@ -200,10 +207,11 @@ where
         })
         .collect();
 
-    Series::new(
+    Series::from_data(
         format!("{}_natr", atr.name()),
         natr_data,
         atr.index().to_vec(),
+        Some(atr.len()),
     )
 }
 
@@ -244,9 +252,9 @@ mod tests {
             49.66, 49.49, 49.21,
         ];
 
-        let high = Series::from_vec("high".to_string(), highs);
-        let low = Series::from_vec("low".to_string(), lows);
-        let close = Series::from_vec("close".to_string(), closes);
+        let high = Series::from_vec("high".to_string(), highs, None);
+        let low = Series::from_vec("low".to_string(), lows, None);
+        let close = Series::from_vec("close".to_string(), closes, None);
         (high, low, close)
     }
 

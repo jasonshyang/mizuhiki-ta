@@ -81,7 +81,7 @@ pub struct RsiResult<T, I> {
 ///
 /// let prices = Series::from_vec("price".to_string(), vec![
 ///     100.0, 102.0, 101.0, 103.0, 104.0, 102.0, 105.0, 106.0, 103.0, 107.0
-/// ]);
+/// ], None);
 ///
 /// let config = RsiConfig::<f64>::default();
 /// let result = rsi(&prices, config);
@@ -156,10 +156,11 @@ where
         })
         .collect();
 
-    Series::new(
+    Series::from_data(
         format!("{}_rsi", avg_gain.name()),
         rsi_data,
         avg_gain.index().to_vec(),
+        Some(avg_gain.len()),
     )
 }
 
@@ -192,7 +193,7 @@ mod tests {
             36.42, 38.17, 38.66, 42.89, 34.47, 30.25, 35.51,
         ];
 
-        let series = Series::from_vec("close".to_string(), prices);
+        let series = Series::from_vec("close".to_string(), prices, None);
         let config = RsiConfig::<f64>::new(14, 1.0 / 14.0);
         let result = rsi(&series, config);
 

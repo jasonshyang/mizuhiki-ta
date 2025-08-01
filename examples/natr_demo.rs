@@ -38,10 +38,10 @@ fn main() {
         closes.push(c);
     }
 
-    let open_series = Series::from_vec("AAPL_open".to_string(), opens);
-    let high_series = Series::from_vec("AAPL_high".to_string(), highs);
-    let low_series = Series::from_vec("AAPL_low".to_string(), lows);
-    let close_series = Series::from_vec("AAPL_close".to_string(), closes);
+    let open_series = Series::from_vec("AAPL_open".to_string(), opens, None);
+    let high_series = Series::from_vec("AAPL_high".to_string(), highs, None);
+    let low_series = Series::from_vec("AAPL_low".to_string(), lows, None);
+    let close_series = Series::from_vec("AAPL_close".to_string(), closes, None);
 
     println!("Processing {} price bars\n", close_series.len());
 
