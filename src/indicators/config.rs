@@ -15,6 +15,7 @@ use crate::core::Numeric;
 /// # Alpha Calculation
 /// * **EMA**: `alpha = 2.0 / (period + 1.0)` - Standard exponential moving average
 /// * **Wilder**: `alpha = 1.0 / period` - Wilder's smoothing (used in RSI)
+#[derive(Debug, Clone)]
 pub struct Config<T> {
     pub alpha: T,
     pub period: usize,
