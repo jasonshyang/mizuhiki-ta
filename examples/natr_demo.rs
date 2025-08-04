@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new_f64_wilder(14, 50);
 
     // Calculate NATR
-    let natr_values = natr_series(&candles, config)?;
+    let natr_values = natr_series(&candles, &config)?;
 
     println!("NATR (Normalized Average True Range) Demo");
     println!("==========================================");

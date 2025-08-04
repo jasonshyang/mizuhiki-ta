@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new_f64(14, 50);
 
     // Calculate RSI
-    let rsi_values = rsi_series(&candles, config)?;
+    let rsi_values = rsi_series(&candles, &config)?;
 
     println!("RSI (Relative Strength Index) Demo");
     println!("===================================");

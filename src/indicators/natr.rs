@@ -31,7 +31,7 @@ use crate::{
 /// Returns `Error::NotEnoughData` if insufficient candles for calculation.
 pub fn natr_series<T: Numeric>(
     candles: &CandleSeries<T>,
-    config: Config<T>,
+    config: &Config<T>,
 ) -> Result<Column<T>, Error> {
     // We need at least `period + 1` candles to calculate RSI
     // Because we lose the first candle when calculating true range
@@ -59,7 +59,7 @@ pub fn natr_series<T: Numeric>(
 
 /// Calculate the latest NATR value for a candle series.
 /// This is more efficient than `natr_series` when only the most recent value is needed.
-pub fn natr_latest<T: Numeric>(candles: &CandleSeries<T>, config: Config<T>) -> Result<T, Error> {
+pub fn natr_latest<T: Numeric>(candles: &CandleSeries<T>, config: &Config<T>) -> Result<T, Error> {
     if candles.len() < config.period + 1 {
         return Err(Error::NotEnoughData);
     }
@@ -139,7 +139,7 @@ mod tests {
         ];
 
         let config = Config::new_f64_wilder(14, 100);
-        let natr = natr_series(&candles, config).unwrap();
+        let natr = natr_series(&candles, &config).unwrap();
 
         assert_eq!(natr.len(), expected_natr.len() + 1); // 1 initial NaN value
 

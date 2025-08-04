@@ -33,7 +33,7 @@ use crate::{
 /// Returns `Error::NotEnoughData` if insufficient candles for calculation.
 pub fn rsi_series<T: Numeric>(
     candles: &CandleSeries<T>,
-    config: Config<T>,
+    config: &Config<T>,
 ) -> Result<Column<T>, Error> {
     // We need at least `period + 1` candles to calculate RSI
     // Because we lose the first candle when calculating gains and losses
@@ -65,7 +65,7 @@ pub fn rsi_series<T: Numeric>(
 
 /// Calculate the latest RSI value for a candle series.
 /// This is more efficient than `rsi_series` when only the most recent value is needed.
-pub fn rsi_latest<T: Numeric>(candles: &CandleSeries<T>, config: Config<T>) -> Result<T, Error> {
+pub fn rsi_latest<T: Numeric>(candles: &CandleSeries<T>, config: &Config<T>) -> Result<T, Error> {
     if candles.len() < config.period + 1 {
         return Err(Error::NotEnoughData);
     }
@@ -115,7 +115,7 @@ mod tests {
 
         let config = Config::new_f64_wilder(14, 100);
 
-        let rsi_values = rsi_series(&candles, config).unwrap();
+        let rsi_values = rsi_series(&candles, &config).unwrap();
 
         assert_eq!(rsi_values.len(), expected_rsi.len() + 14);
 
