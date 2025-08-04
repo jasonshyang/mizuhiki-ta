@@ -50,5 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Latest RSI: {:.2} - {}", last_rsi, interpretation);
     }
 
+    println!("Candle Series: {}", candles);
+
     Ok(())
 }

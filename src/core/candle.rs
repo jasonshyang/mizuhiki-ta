@@ -1,6 +1,7 @@
 //! OHLCV candle data structures and operations.
 
 use crate::core::Error;
+use std::fmt::Display;
 
 use super::{Column, Numeric};
 
@@ -279,5 +280,109 @@ impl<T: Numeric> From<CandleRef<'_, T>> for Candle<T> {
             close: *candle_ref.close,
             volume: *candle_ref.volume,
         }
+    }
+}
+
+impl<T: Numeric + Display> Display for Candle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Candle[O:{:.2} H:{:.2} L:{:.2} C:{:.2} V:{:.0}]",
+            self.open, self.high, self.low, self.close, self.volume
+        )
+    }
+}
+
+impl<T: Numeric + Display> Display for CandleRef<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "CandleRef[O:{:.2} H:{:.2} L:{:.2} C:{:.2} V:{:.0}]",
+            self.open, self.high, self.low, self.close, self.volume
+        )
+    }
+}
+
+impl<T: Numeric + Display> Display for CandleSeries<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CANDLE SERIES")?;
+        write!(f, "\n├─ Candles: {}", self.len())?;
+        write!(f, "\n├─ Timeframe: {}", self.timeframe)?;
+
+        if self.is_empty() {
+            write!(f, "\n└─ Status: EMPTY")?;
+            return Ok(());
+        }
+
+        // Get first and last candles for range info
+        let first = self.get_owned(0).unwrap();
+        let latest = self.get_owned(self.len() - 1).unwrap();
+
+        // Calculate price change and percentage
+        let price_change = latest.close - first.open;
+
+        // Find high and low across the series
+        let mut series_high = self.highs()[0];
+        let mut series_low = self.lows()[0];
+
+        for &high in self.highs().iter() {
+            if high > series_high {
+                series_high = high;
+            }
+        }
+
+        for &low in self.lows().iter() {
+            if low < series_low {
+                series_low = low;
+            }
+        }
+
+        // Calculate total volume
+        let total_volume: T = self.volumes().iter().copied().sum();
+
+        // Get timestamps
+        let start_timestamp = self.timestamps[0];
+        let latest_timestamp = self.timestamps[self.len() - 1];
+
+        write!(f, "\n├─ Start Time: {start_timestamp}")?;
+        write!(f, "\n├─ Latest Time: {latest_timestamp}")?;
+        write!(
+            f,
+            "\n├─ Price Range: {:.2} - {:.2} (Spread: {:.2})",
+            series_low,
+            series_high,
+            series_high - series_low
+        )?;
+        write!(f, "\n├─ Price Change: {:.2}", price_change)?;
+        write!(f, "\n├─ Total Volume: {:.0}", total_volume)?;
+
+        // Show last few candles for recent price action
+        let show_count = std::cmp::min(14, self.len());
+        write!(f, "\n├─ Recent {} Candles:", show_count)?;
+
+        for (idx, i) in (self.len().saturating_sub(show_count)..self.len()).enumerate() {
+            if let Some(candle) = self.get_owned(i) {
+                let prefix = if idx == show_count - 1 {
+                    "└─ "
+                } else {
+                    "│  "
+                };
+                write!(
+                    f,
+                    "\n{} O:{:.2} H:{:.2} L:{:.2} C:{:.2} V:{:.0}",
+                    prefix, candle.open, candle.high, candle.low, candle.close, candle.volume
+                )?;
+            }
+        }
+
+        if show_count == 0 {
+            write!(
+                f,
+                "\n└─ Latest: O:{:.2} H:{:.2} L:{:.2} C:{:.2} V:{:.0}",
+                latest.open, latest.high, latest.low, latest.close, latest.volume
+            )?;
+        }
+
+        Ok(())
     }
 }
